@@ -213,6 +213,7 @@ c-----------------------------------------------------------------------
          call userchk
          tuchk = tuchk + dnekclock()-etime1
          call prepost (ifoutfld,'his')
+         call prepost (ifoutfld,'grd')
          call in_situ_check()
          if (mod(kstep,irstat).eq.0 .and. lastep.eq.0) call runstat 
          if (lastep .eq. 1) goto 1001
@@ -229,6 +230,7 @@ c     check for post-processing mode
          call userchk
          if(nio.eq.0) write(6,*) 'done :: userchk'
          call prepost (.true.,'his')
+         call prepost (.true.,'grd')
       else
          if (nio.eq.0) write(6,'(/,A,/)') 
      $      'end of time-step loop' 
