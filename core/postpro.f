@@ -2198,7 +2198,7 @@ c     ASSUMING LHIS IS MAX NUMBER OF POINTS TO READ IN ON ONE PROCESSOR
      &                            wrk(1,ifld))
       enddo
       ! write interpolation results to hpts.out
-      call gpts_out(fieldout,nflds,nfldm,npoints,nbuff)
+      call gpts_out(fieldout,pts,nflds,nfldm,npts,npoints,nbuff)
 
       call prepost_map(1)  ! maps back axisymm arrays
 
@@ -2330,14 +2330,22 @@ c                        npts=local count; npoints=total count
       return
       end
 c-----------------------------------------------------------------------
-      subroutine gpts_out(fieldout,nflds,nfldm,npoints,nbuff)
+      subroutine gpts_out(fieldout,pts,nflds,nfldm,npts,npoints,nbuff)
 
       include 'SIZE'
       include 'TOTAL'
 
       real buf(nfldm,nbuff),fieldout(nfldm,nbuff)
+      integer gptsCallNum,plusOne
+      character*4 callNumString
+      character*12 h5fs
+      save gptsCallNum
+      data gptsCallNum /0/
 
       len = wdsize*nfldm*nbuff
+      
+
+
 
 
       npass = npoints/nbuff + 1
@@ -2365,6 +2373,10 @@ c-----------------------------------------------------------------------
         else  !ipass.eq.npass
 
           if(nid.eq.0) then
+            write(callNumString,'(i0.4)') gptsCallNum
+            h5fs = 'grd'//callNumString//'.hdf5'
+            call write_hdf5(h5fs,pts,
+     &                      fieldout,nfldm,npts,npoints,nbuff)
             do ip = 1,il
               write(51,'(1p20E15.7)') time,
      &         (fieldout(i,ip), i=1,nflds)
@@ -2373,6 +2385,94 @@ c-----------------------------------------------------------------------
 
         endif
       enddo
+      gptsCallNum = gptsCallNum+1
 
       return
       end
+c--------------------------------------------------------------
+c Write fields to hdf5 file rather than *.grd
+c Not setup for parallelization, probably crashes or 
+c doesn't work if full grid can't fit on memory, so that needs to be
+c fixed
+      subroutine write_hdf5(filename,pts,
+     $                      fieldout,nfldm,npts,npoints,nbuff)
+      use hdf5
+      implicit none
+      INCLUDE 'SIZE'
+      character(len=*) filename
+      real fieldout(nfldm,nbuff)
+      integer npts
+      real    pts(ldim,npts)
+      integer error,space_rank
+      integer nfldm,npoints,nbuff
+      integer(HSIZE_T) data_dims(1)
+      integer(HID_T) file_id, dspace_id
+      integer(HID_T) dset_idx,dset_idy,dset_idz,
+     $               dset_idux,dset_iduy,dset_iduz,
+     $               dset_idp,dset_idt
+
+      space_rank = 1
+      data_dims(1) = npoints
+      call h5open_f(error)
+      call h5fcreate_f(filename,H5F_ACC_TRUNC_F,file_id,error)
+              !open dataspace
+      call h5screate_simple_f(space_rank,data_dims,dspace_id,error)
+      !create dataset
+      call h5dcreate_f(file_id,"x",H5T_NATIVE_DOUBLE,dspace_id,
+     $dset_idx,error)
+      call h5dcreate_f(file_id,"y",H5T_NATIVE_DOUBLE,dspace_id,
+     $dset_idy,error)
+      call h5dcreate_f(file_id,"u",H5T_NATIVE_DOUBLE,dspace_id,
+     $dset_idux,error)
+      call h5dcreate_f(file_id,"v",H5T_NATIVE_DOUBLE,dspace_id,
+     $dset_iduy,error)
+      call h5dcreate_f(file_id,"p",H5T_NATIVE_DOUBLE,dspace_id,
+     $dset_idp,error)
+      call h5dcreate_f(file_id,"t",H5T_NATIVE_DOUBLE,dspace_id,
+     $dset_idt,error)
+      !write dset
+      call h5dwrite_f(dset_idx,H5T_NATIVE_DOUBLE,pts(1,1:nbuff),
+     $data_dims,error)
+      call h5dwrite_f(dset_idy,H5T_NATIVE_DOUBLE,pts(2,1:nbuff),
+     $data_dims,error)
+      if (nfldm.eq.3) then
+        call h5dcreate_f(file_id,"z",H5T_NATIVE_DOUBLE,dspace_id,
+     $  dset_idz,error)
+        call h5dcreate_f(file_id,"w",H5T_NATIVE_DOUBLE,dspace_id,
+     $  dset_iduz,error)
+        call h5dwrite_f(dset_idz,H5T_NATIVE_DOUBLE,pts(3,1:nbuff),
+     $  data_dims,error)
+        call h5dwrite_f(dset_iduz,H5T_NATIVE_DOUBLE,fieldout(3,:),
+     $  data_dims,error)
+        call h5dwrite_f(dset_idp,H5T_NATIVE_DOUBLE,fieldout(4,:),
+     $  data_dims,error)
+        call h5dwrite_f(dset_idt,H5T_NATIVE_DOUBLE,fieldout(5,:),
+     $  data_dims,error)
+        call h5dclose_f(dset_idz,error)
+        call h5dclose_f(dset_iduz,error)
+      else
+        call h5dwrite_f(dset_idp,H5T_NATIVE_DOUBLE,fieldout(3,:),
+     $  data_dims,error)
+        call h5dwrite_f(dset_idt,H5T_NATIVE_DOUBLE,fieldout(4,:),
+     $  data_dims,error)
+      endif
+
+      call h5dwrite_f(dset_idux,H5T_NATIVE_DOUBLE,fieldout(1,:),
+     $data_dims,error)
+      call h5dwrite_f(dset_iduy,H5T_NATIVE_DOUBLE,fieldout(2,:),
+     $data_dims,error)
+
+      call h5dclose_f(dset_idx,error)
+      call h5dclose_f(dset_idy,error)
+      call h5dclose_f(dset_idux,error)
+      call h5dclose_f(dset_iduy,error)
+      call h5dclose_f(dset_idp,error)
+      call h5dclose_f(dset_idt,error)
+      call h5sclose_f(dspace_id,error)
+
+      call h5fclose_f(file_id,error)
+
+      call h5close_f(error)
+
+      end subroutine write_hdf5
+

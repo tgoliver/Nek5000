@@ -18,6 +18,7 @@ PPS=
 
 USR=
 USR_LFLAGS=
+USR_LFLAGS+= -L/usr/lib/x86_64-linux-gnu/hdf5/serial
 
 MPI=0 
 DPROCMAP=0
@@ -88,6 +89,7 @@ TMP1 = $(CORE) $(MXM) $(USR) $(COMM_MPI) $(VISITO)
 INCLUDES_DIR += $(OPT_INCDIR)
 INCLUDES_DIR += $(S)/core/experimental
 INCLUDES_DIR += $(OBJDIR)
+INCLUDES_DIR += /usr/include/hdf5/serial
 INCLUDES:= $(foreach dir,$(INCLUDES_DIR),-I$(dir))
 #$(info $(shell echo "INCLUDES: $(INCLUDES)"))
 
