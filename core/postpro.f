@@ -2201,68 +2201,7 @@ c     ASSUMING LHIS IS MAX NUMBER OF POINTS TO READ IN ON ONE PROCESSOR
       call gpts_out(fieldout,pts,nflds,nfldm,npts,npoints,nbuff)
 
       call prepost_map(1)  ! maps back axisymm arrays
-
-      return
-      end
-c-----------------------------------------------------------------------
-      subroutine gbuffer_in(buffer,npp,npoints,nbuf)
-        
-      include 'SIZE'
-      include 'INPUT'
-      include 'PARALLEL'
-
-      real    buffer(ldim,nbuf)  
-
-      ierr = 0
-      if(nid.eq.0) then
-        write(6,*) 'reading grid points'
-        open(51,file=grdfle,status='old',err=100)
-        read(51,*,err=100) npoints
-        goto 101
- 100    ierr = 1
- 101    continue
-      endif
-      ierr=iglsum(ierr,1)
-      if(ierr.gt.0) then
-        if(nio.eq.0) 
-     &   write(6,*) 'Cannot open history file in subroutine hpts()'
-        call exitt
-      endif
-      
-      call bcast(npoints,isize)
-      if(npoints.gt.(lhis-1)*np) then
-        if(nid.eq.0) write(6,*) 'ABORT: Increase lhis in SIZE!'
-        call exitt
-      endif
-      if(nid.eq.0) write(6,*) 'found ', npoints, ' points'
-
-
-      npass =  npoints/nbuf +1  !number of passes to cover all pts
-      n0    =  mod(npoints,nbuf)!remainder 
-      if(n0.eq.0) then
-         npass = npass-1
-         n0    = nbuf
-      endif
-
-      len = wdsize*ldim*nbuf
-      if (nid.gt.0.and.nid.lt.npass) msg_id=irecv(nid,buffer,len)
-      call nekgsync
-      
-      npp=0  
-      if(nid.eq.0) then
-        i1 = nbuf
-        do ipass = 1,npass
-           if(ipass.eq.npass) i1 = n0
-           do i = 1,i1
-              read(51,*) (buffer(j,i),j=1,ldim) 
-           enddo
-           if(ipass.lt.npass)call csend(ipass,buffer,len,ipass,0)
-        enddo
-        npp = n0
-      elseif (nid.lt.npass)  then !processors receiving data
-        call msgwait(msg_id)
-        npp=nbuf
-      endif
+      print *, 'TOBIAS ntps is ',npts
 
       return
       end
@@ -2326,6 +2265,68 @@ c                        npts=local count; npoints=total count
       endif
       npts = npp
 
+
+      return
+      end
+c-----------------------------------------------------------------------
+      subroutine gbuffer_in(buffer,npp,npoints,nbuf)
+        
+      include 'SIZE'
+      include 'INPUT'
+      include 'PARALLEL'
+
+      real    buffer(ldim,nbuf)  
+
+      ierr = 0
+      if(nid.eq.0) then
+        write(6,*) 'reading grid points'
+        open(51,file=grdfle,status='old',err=100)
+        read(51,*,err=100) npoints
+        goto 101
+ 100    ierr = 1
+ 101    continue
+      endif
+      ierr=iglsum(ierr,1)
+      if(ierr.gt.0) then
+        if(nio.eq.0) 
+     &   write(6,*) 'Cannot open history file in subroutine hpts()'
+        call exitt
+      endif
+      
+      call bcast(npoints,isize)
+      if(npoints.gt.(lhis-1)*np) then
+        if(nid.eq.0) write(6,*) 'ABORT: Increase lhis in SIZE!'
+        call exitt
+      endif
+      if(nid.eq.0) write(6,*) 'found ', npoints, ' points'
+
+
+      npass =  npoints/nbuf +1  !number of passes to cover all pts
+      n0    =  mod(npoints,nbuf)!remainder 
+      if(n0.eq.0) then
+         npass = npass-1
+         n0    = nbuf
+      endif
+
+      len = wdsize*ldim*nbuf
+      if (nid.gt.0.and.nid.lt.npass) msg_id=irecv(nid,buffer,len)
+      call nekgsync
+      
+      npp=0  
+      if(nid.eq.0) then
+        i1 = nbuf
+        do ipass = 1,npass
+           if(ipass.eq.npass) i1 = n0
+           do i = 1,i1
+              read(51,*) (buffer(j,i),j=1,ldim) 
+           enddo
+           if(ipass.lt.npass)call csend(ipass,buffer,len,ipass,0)
+        enddo
+        npp = n0
+      elseif (nid.lt.npass)  then !processors receiving data
+        call msgwait(msg_id)
+        npp=nbuf
+      endif
 
       return
       end
