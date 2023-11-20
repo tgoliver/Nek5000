@@ -2338,7 +2338,7 @@ c-----------------------------------------------------------------------
       include 'TOTAL'
 
       real buf(nfldm,nbuff),fieldout(nfldm,nbuff)
-      real pts(ldim,npts)
+      real pbuf(ldim,nbuff),pts(ldim,npts)
       integer(HSIZE_T) offset(1)
       character*4 callNumString
       character*12 filename
@@ -2355,10 +2355,10 @@ c-----------------------------------------------------------------------
       data gptsCallNum /0/
 
       len = wdsize*nfldm*nbuff
+      len2 = wdsize*ldim*nbuff
 
       data_dims(1) = npoints
       space_rank = 1
-      print *,'TOBIAS',nid, npts,npoints
 
       write(callNumString,'(i0.4)') gptsCallNum
       if(nid.eq.0) then
@@ -2381,7 +2381,7 @@ c-----------------------------------------------------------------------
      $  dset_idp,error)
         call h5dcreate_f(file_id,"t",H5T_NATIVE_DOUBLE,dspace_id,
      $  dset_idt,error)
-        if (nfldm.eq.3) then
+        if (ldim.eq.3) then
           call h5dcreate_f(file_id,"z",H5T_NATIVE_DOUBLE,dspace_id,
      $    dset_idz,error)
           call h5dcreate_f(file_id,"w",H5T_NATIVE_DOUBLE,dspace_id,
@@ -2410,22 +2410,14 @@ c-----------------------------------------------------------------------
             do ip = 1,nbuff
               write(51,'(1p20E15.7)') time,
      &         (buf(i,ip), i=1,nflds)
-c            call write_hdf5(filename,pts(1,1:npts),
-c     &                      nfldm,npts,npoints,nbuff,offset,
-c     &                      dspace_id,dset_idx)
-c            call write_hdf5(filename,pts(2,1:npts),
-c     &                      nfldm,npts,npoints,nbuff,offset,
-c     &                      dspace_id,dset_idy)
+            enddo
             call write_hdf5(filename,buf(1,:),
      &                      nfldm,nbuff,npoints,nbuff,offset,
      &                      dspace_id,dset_idux)
             call write_hdf5(filename,buf(2,:),
      &                      nfldm,nbuff,npoints,nbuff,offset,
      &                      dspace_id,dset_iduy)
-            if(nfldim.eq.3) then
-c              call write_hdf5(filename,pts(1,1:npts),
-c     &                      nfldm,npts,npoints,nbuff,offset,
-c     &                      dspace_id,dset_iduz)
+            if(ldim.eq.3) then
               call write_hdf5(filename,buf(3,:),
      &                      nfldm,nbuff,npoints,nbuff,offset,
      &                      dspace_id,dset_iduz)
@@ -2443,7 +2435,6 @@ c     &                      dspace_id,dset_iduz)
      &                      nfldm,nbuff,npoints,nbuff,offset,
      &                      dspace_id,dset_idt)
             endif
-            enddo
             offset(1) = offset(1) + nbuff
           elseif(nid.eq.ipass) then
             call csend(ipass,fieldout,len,0,nid)
@@ -2464,10 +2455,10 @@ c     &                      dspace_id,dset_iduz)
             call write_hdf5(filename,fieldout(2,:),
      &                      nfldm,npts,npoints,nbuff,offset,
      &                      dspace_id,dset_iduy)
-            if(nfldim.eq.3) then
-              call write_hdf5(filename,pts(1,1:npts),
+            if(ldim.eq.3) then
+              call write_hdf5(filename,pts(3,1:npts),
      &                      nfldm,npts,npoints,nbuff,offset,
-     &                      dspace_id,dset_iduz)
+     &                      dspace_id,dset_idz)
               call write_hdf5(filename,fieldout(3,:),
      &                      nfldm,npts,npoints,nbuff,offset,
      &                      dspace_id,dset_iduz)
@@ -2493,6 +2484,35 @@ c     &                      dspace_id,dset_iduz)
 
         endif
       enddo
+
+      offset(1) = 0
+      do ipass = 1,npass
+
+
+        call nekgsync
+        if(ipass.lt.npass) then
+          if(nid.eq.0) then
+            call crecv(ipass,pbuf,len2)
+            call write_hdf5(filename,pbuf(1,1:nbuff),
+     &                    nfldm,npts,npoints,nbuff,offset,
+     &                    dspace_id,dset_idx)
+            call write_hdf5(filename,pbuf(2,1:nbuff),
+     &                    nfldm,npts,npoints,nbuff,offset,
+     &                    dspace_id,dset_idy)
+            if(ldim.eq.3) then
+              call write_hdf5(filename,pbuf(3,1:nbuff),
+     &                      nfldm,npts,npoints,nbuff,offset,
+     &                      dspace_id,dset_idz)
+            endif
+            offset(1) = offset(1) + nbuff
+          elseif(nid.eq.ipass) then
+            call csend(ipass,pts,len2,0,nid)
+          endif
+
+
+        endif
+      enddo
+
       if(nid.eq.0) then
         call h5dclose_f(dset_idx,error)
         call h5dclose_f(dset_idy,error)
@@ -2501,7 +2521,7 @@ c     &                      dspace_id,dset_iduz)
         call h5dclose_f(dset_idp,error)
         call h5dclose_f(dset_idt,error)
         call h5sclose_f(dspace_id,error)
-        if (nfldm.eq.3) then
+        if (ldim.eq.3) then
           call h5dclose_f(dset_idz,error)
           call h5dclose_f(dset_iduz,error)
         endif
@@ -2517,12 +2537,9 @@ c     &                      dspace_id,dset_iduz)
       end
 c--------------------------------------------------------------
 c Write fields to hdf5 file rather than *.grd
-c Not setup for parallelization, probably crashes or 
-c doesn't work if full grid can't fit on memory, so that needs to be
-c fixed
       subroutine write_hdf5(filename,dArray,
-     $nfldm,npts,npoints,nbuff,offset,
-     $dspace_id,dset_id)
+     $  nfldm,npts,npoints,nbuff,offset,
+     $  dspace_id,dset_id)
 
       use hdf5
 
@@ -2556,37 +2573,8 @@ c fixed
      $                          start,cnt,error)
 
       !write dset
-      print *,'TOBIAS',offset,cnt
       call h5dwrite_f(dset_id,H5T_NATIVE_DOUBLE,dArray,
      $                data_dims,error,mid,dspace_id)
-cccc      call h5dwrite_f(dset_idy,H5T_NATIVE_DOUBLE,pts(2,1:nbuff),
-cccc     $data_dims,error)
-cccc      if (nfldm.eq.3) then
-ccccc        call h5dcreate_f(file_id,"z",H5T_NATIVE_DOUBLE,dspace_id,
-ccccc     $  dset_idz,error)
-ccccc        call h5dcreate_f(file_id,"w",H5T_NATIVE_DOUBLE,dspace_id,
-ccccc     $  dset_iduz,error)
-cccc        call h5dwrite_f(dset_idz,H5T_NATIVE_DOUBLE,pts(3,1:nbuff),
-cccc     $  data_dims,error)
-cccc        call h5dwrite_f(dset_iduz,H5T_NATIVE_DOUBLE,fieldout(3,:),
-cccc     $  data_dims,error)
-cccc        call h5dwrite_f(dset_idp,H5T_NATIVE_DOUBLE,fieldout(4,:),
-cccc     $  data_dims,error)
-cccc        call h5dwrite_f(dset_idt,H5T_NATIVE_DOUBLE,fieldout(5,:),
-cccc     $  data_dims,error)
-cccc        call h5dclose_f(dset_idz,error)
-cccc        call h5dclose_f(dset_iduz,error)
-cccc      else
-cccc        call h5dwrite_f(dset_idp,H5T_NATIVE_DOUBLE,fieldout(3,:),
-cccc     $  data_dims,error)
-cccc        call h5dwrite_f(dset_idt,H5T_NATIVE_DOUBLE,fieldout(4,:),
-cccc     $  data_dims,error)
-cccc      endif
-cccc
-cccc      call h5dwrite_f(dset_idux,H5T_NATIVE_DOUBLE,fieldout(1,:),
-cccc     $data_dims,error)
-cccc      call h5dwrite_f(dset_iduy,H5T_NATIVE_DOUBLE,fieldout(2,:),
-cccc     $data_dims,error)
 
 
       end subroutine write_hdf5
