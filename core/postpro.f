@@ -2331,7 +2331,7 @@ c-----------------------------------------------------------------------
       end
 c-----------------------------------------------------------------------
       subroutine gpts_out(fieldout,pts,nflds,nfldm,npts,npoints,nbuff)
-      ! get pts from other processors... 
+
       use hdf5
 
       include 'SIZE'
@@ -2359,6 +2359,7 @@ c-----------------------------------------------------------------------
 
       data_dims(1) = npoints
       space_rank = 1
+      print*, 'TOBIAS',nid,nbuff,npts
 
       write(callNumString,'(i0.4)') gptsCallNum
       if(nid.eq.0) then
@@ -2408,8 +2409,8 @@ c-----------------------------------------------------------------------
           if(nid.eq.0) then
             call crecv(ipass,buf,len)
             do ip = 1,nbuff
-              write(51,'(1p20E15.7)') time,
-     &         (buf(i,ip), i=1,nflds)
+c              write(51,'(1p20E15.7)') time,
+c     &         (buf(i,ip), i=1,nflds)
             enddo
             call write_hdf5(filename,buf(1,:),
      &                      nfldm,nbuff,npoints,nbuff,offset,
@@ -2477,8 +2478,8 @@ c-----------------------------------------------------------------------
      &                      dspace_id,dset_idt)
             endif
             do ip = 1,il
-              write(51,'(1p20E15.7)') time,
-     &         (fieldout(i,ip), i=1,nflds)
+c              write(51,'(1p20E15.7)') time,
+c     &         (fieldout(i,ip), i=1,nflds)
             enddo
           endif
 
@@ -2494,14 +2495,14 @@ c-----------------------------------------------------------------------
           if(nid.eq.0) then
             call crecv(ipass,pbuf,len2)
             call write_hdf5(filename,pbuf(1,1:nbuff),
-     &                    nfldm,npts,npoints,nbuff,offset,
+     &                    nfldm,nbuff,npoints,nbuff,offset,
      &                    dspace_id,dset_idx)
             call write_hdf5(filename,pbuf(2,1:nbuff),
-     &                    nfldm,npts,npoints,nbuff,offset,
+     &                    nfldm,nbuff,npoints,nbuff,offset,
      &                    dspace_id,dset_idy)
             if(ldim.eq.3) then
               call write_hdf5(filename,pbuf(3,1:nbuff),
-     &                      nfldm,npts,npoints,nbuff,offset,
+     &                      nfldm,nbuff,npoints,nbuff,offset,
      &                      dspace_id,dset_idz)
             endif
             offset(1) = offset(1) + nbuff
