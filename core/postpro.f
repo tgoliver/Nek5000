@@ -2346,10 +2346,11 @@ c-----------------------------------------------------------------------
       integer gptsCallNum,plusOne
       integer error,space_rank
       integer(HSIZE_T) data_dims(1)
-      integer(HID_T) file_id, dspace_id
+      integer(HSIZE_T) metadata_dims(1)
+      integer(HID_T) file_id, dspace_id,dspacet_id
       integer(HID_T) dset_idx,dset_idy,dset_idz,
      $               dset_idux,dset_iduy,dset_iduz,
-     $               dset_idp,dset_idt
+     $               dset_idp,dset_idt,dset_idtime
 
       save gptsCallNum
       data gptsCallNum /0/
@@ -2358,6 +2359,7 @@ c-----------------------------------------------------------------------
       len2 = wdsize*ldim*nbuff
 
       data_dims(1) = npoints
+      metadata_dims(1) = 1
       space_rank = 1
       print*, 'TOBIAS',nid,nbuff,npts
 
@@ -2367,7 +2369,20 @@ c-----------------------------------------------------------------------
 
         call h5open_f(error)
         call h5fcreate_f(filename,H5F_ACC_TRUNC_F,file_id,error)
-                !open dataspace
+        call h5screate_simple_f(space_rank,metadata_dims,
+     $                          dspacet_id,error)
+        !create dataset
+        call h5dcreate_f(file_id,"time",H5T_NATIVE_DOUBLE,dspacet_id,
+     $   dset_idtime,error)
+        if (nid.eq.0) then
+          call h5dwrite_f(dset_idtime,H5T_NATIVE_DOUBLE,time,
+     $                    metadata_dims,error)
+          call h5dclose_f(dset_idtime,error)
+          call h5sclose_f(dspacet_id,error)
+
+        endif
+
+        !open dataspace
         call h5screate_simple_f(space_rank,data_dims,dspace_id,error)
         !create dataset
         call h5dcreate_f(file_id,"x",H5T_NATIVE_DOUBLE,dspace_id,
