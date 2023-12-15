@@ -1517,8 +1517,7 @@ c     ASSUMING LHIS IS MAX NUMBER OF POINTS TO READ IN ON ONE PROCESSOR
 
       include 'SIZE'
       include 'TOTAL'
-
-      parameter(nfldm=ldim+ldimt+1)
+      parameter(nfldm=ldim+ldimt + 1 + ldimb)
 
       real pts, fieldout, dist, rst
       common /c_hptsr/ pts      (ldim,lhis)
@@ -1588,12 +1587,24 @@ c     ASSUMING LHIS IS MAX NUMBER OF POINTS TO READ IN ON ONE PROCESSOR
         nflds = nflds + 1
         call copy(wrk(1,nflds),t,ntot)
       endif
+      if(ifbo) then
+        call copy(wrk(1,nflds+1),bx,ntot)
+        call copy(wrk(1,nflds+2),by,ntot)
+        if(if3d) then
+          call copy(wrk(1,nflds+3),bz,ntot)
+          nflds = nflds + 3
+        else
+          nflds = nflds + 2
+        endif
+      endif
       do i = 1,ldimt
          if(ifpsco(i)) then
            nflds = nflds + 1
            call copy(wrk(1,nflds),T(1,1,1,1,i+1),ntot)
          endif
       enddo
+
+      
       
       ! interpolate
       if(icalld.eq.0) then
@@ -1628,7 +1639,7 @@ c     ASSUMING LHIS IS MAX NUMBER OF POINTS TO READ IN ON ONE PROCESSOR
 
 
       ! evaluate input field at given points
-      do ifld = 1,nflds
+      do ifld = 1, nflds
          call fgslib_findpts_eval(inth_hpts,fieldout(ifld,1),nfldm,
      &                            rcode,1,
      &                            proc,1,
@@ -2079,7 +2090,7 @@ c     ASSUMING LHIS IS MAX NUMBER OF POINTS TO READ IN ON ONE PROCESSOR
       include 'SIZE'
       include 'TOTAL'
 
-      parameter(nfldm=ldim+ldimt+1)
+      parameter(nfldm=ldim+ldimt+1 + ldimb)
 
       real pts, fieldout, dist, rst
       common /c_hptsr/ pts      (ldim,lhis)
