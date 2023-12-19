@@ -2160,6 +2160,16 @@ c     ASSUMING LHIS IS MAX NUMBER OF POINTS TO READ IN ON ONE PROCESSOR
         nflds = nflds + 1
         call copy(wrk(1,nflds),t,ntot)
       endif
+      if(ifbo) then
+        call copy(wrk(1,nflds+1),bx,ntot)
+        call copy(wrk(1,nflds+2),by,ntot)
+        if(if3d) then
+          call copy(wrk(1,nflds+3),bz,ntot)
+          nflds = nflds + 3
+        else
+          nflds = nflds + 2
+        endif
+      endif
       do i = 1,ldimt
          if(ifpsco(i)) then
            nflds = nflds + 1
@@ -2361,6 +2371,7 @@ c-----------------------------------------------------------------------
       integer(HID_T) file_id, dspace_id,dspacet_id
       integer(HID_T) dset_idx,dset_idy,dset_idz,
      $               dset_idux,dset_iduy,dset_iduz,
+     $               dset_idbx,dset_idby,dset_idbz,
      $               dset_idp,dset_idt,dset_idtime
 
       save gptsCallNum
@@ -2414,6 +2425,16 @@ c-----------------------------------------------------------------------
           call h5dcreate_f(file_id,"w",H5T_NATIVE_DOUBLE,dspace_id,
      $    dset_iduz,error)
         endif
+        if(ifbo) then
+          call h5dcreate_f(file_id,"bx",H5T_NATIVE_DOUBLE,dspace_id,
+     $    dset_idbx,error)
+          call h5dcreate_f(file_id,"by",H5T_NATIVE_DOUBLE,dspace_id,
+     $    dset_idby,error)
+          if(ldim.eq.3) then
+            call h5dcreate_f(file_id,"bz",H5T_NATIVE_DOUBLE,dspace_id,
+     $      dset_idbz,error)
+          endif
+        endif
       endif
 
 
@@ -2454,6 +2475,18 @@ c     &         (buf(i,ip), i=1,nflds)
               call write_hdf5(filename,buf(5,:),
      &                      nfldm,nbuff,npoints,nbuff,offset,
      &                      dspace_id,dset_idt)
+              if(ifbo) then
+                call write_hdf5(filename,buf(6,:),
+     &                        nfldm,nbuff,npoints,nbuff,offset,
+     &                        dspace_id,dset_idbx)
+                call write_hdf5(filename,buf(7,:),
+     &                        nfldm,nbuff,npoints,nbuff,offset,
+     &                        dspace_id,dset_idby)
+                call write_hdf5(filename,buf(8,:),
+     &                        nfldm,nbuff,npoints,nbuff,offset,
+     &                        dspace_id,dset_idbz)
+              endif
+              
             else
               call write_hdf5(filename,buf(3,:),
      &                      nfldm,nbuff,npoints,nbuff,offset,
@@ -2461,6 +2494,14 @@ c     &         (buf(i,ip), i=1,nflds)
               call write_hdf5(filename,buf(4,:),
      &                      nfldm,nbuff,npoints,nbuff,offset,
      &                      dspace_id,dset_idt)
+              if(ifbo) then
+                call write_hdf5(filename,buf(5,:),
+     &                        nfldm,nbuff,npoints,nbuff,offset,
+     &                        dspace_id,dset_idbx)
+                call write_hdf5(filename,buf(6,:),
+     &                        nfldm,nbuff,npoints,nbuff,offset,
+     &                        dspace_id,dset_idby)
+              endif
             endif
             offset(1) = offset(1) + nbuff
           elseif(nid.eq.ipass) then
@@ -2495,6 +2536,18 @@ c     &         (buf(i,ip), i=1,nflds)
               call write_hdf5(filename,fieldout(5,:),
      &                      nfldm,npts,npoints,nbuff,offset,
      &                      dspace_id,dset_idt)
+              if(ifbo) then
+                call write_hdf5(filename,fieldout(6,:),
+     &                        nfldm,npts,npoints,nbuff,offset,
+     &                        dspace_id,dset_idbx)
+                call write_hdf5(filename,fieldout(7,:),
+     &                        nfldm,npts,npoints,nbuff,offset,
+     &                        dspace_id,dset_idby)
+                call write_hdf5(filename,fieldout(8,:),
+     &                        nfldm,npts,npoints,nbuff,offset,
+     &                        dspace_id,dset_idbz)
+              endif
+   
             else
               call write_hdf5(filename,fieldout(3,:),
      &                      nfldm,npts,npoints,nbuff,offset,
@@ -2502,11 +2555,19 @@ c     &         (buf(i,ip), i=1,nflds)
               call write_hdf5(filename,fieldout(4,:),
      &                      nfldm,npts,npoints,nbuff,offset,
      &                      dspace_id,dset_idt)
+              if(ifbo) then
+                call write_hdf5(filename,fieldout(5,:),
+     &                        nfldm,npts,npoints,nbuff,offset,
+     &                        dspace_id,dset_idbx)
+                call write_hdf5(filename,fieldout(6,:),
+     &                        nfldm,npts,npoints,nbuff,offset,
+     &                        dspace_id,dset_idby)
+              endif
             endif
-            do ip = 1,il
+c            do ip = 1,il
 c              write(51,'(1p20E15.7)') time,
 c     &         (fieldout(i,ip), i=1,nflds)
-            enddo
+c            enddo
           endif
 
         endif
@@ -2547,11 +2608,18 @@ c     &         (fieldout(i,ip), i=1,nflds)
         call h5dclose_f(dset_iduy,error)
         call h5dclose_f(dset_idp,error)
         call h5dclose_f(dset_idt,error)
-        call h5sclose_f(dspace_id,error)
+        if(ifbo) then
+          call h5dclose_f(dset_idbx,error)
+          call h5dclose_f(dset_idby,error)
+        endif
         if (ldim.eq.3) then
           call h5dclose_f(dset_idz,error)
           call h5dclose_f(dset_iduz,error)
+          if(ifbo) then
+            call h5dclose_f(dset_idbz,error)
+          endif
         endif
+        call h5sclose_f(dspace_id,error)
 
 
         call h5fclose_f(file_id,error)
