@@ -18,7 +18,7 @@ PPS=
 
 USR=
 USR_LFLAGS=
-USR_LFLAGS+= -L$(TACC_HDF5_LIB)
+#USR_LFLAGS+=  #ADD HDF5 lib here
 
 
 MPI=0 
@@ -90,7 +90,7 @@ TMP1 = $(CORE) $(MXM) $(USR) $(COMM_MPI) $(VISITO)
 INCLUDES_DIR += $(OPT_INCDIR)
 INCLUDES_DIR += $(S)/core/experimental
 INCLUDES_DIR += $(OBJDIR)
-INCLUDES_DIR += $(TACC_HDF5_INC)
+#INCLUDES_DIR += $(TACC_HDF5_INC) #Add HDF5 (hdf5) include here
 INCLUDES:= $(foreach dir,$(INCLUDES_DIR),-I$(dir))
 #$(info $(shell echo "INCLUDES: $(INCLUDES)"))
 

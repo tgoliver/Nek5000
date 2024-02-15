@@ -20,8 +20,9 @@ bin/pretex
 bin/prex
 bin/re2torea
 bin/reatore2
-#bin/makenek
-#core/makefile.template
+bin/makenek
+bin/nekmpi
+core/makefile.template
 tools/maketools
 
 __pycache__
