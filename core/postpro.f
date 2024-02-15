@@ -1517,7 +1517,6 @@ c     ASSUMING LHIS IS MAX NUMBER OF POINTS TO READ IN ON ONE PROCESSOR
 
       include 'SIZE'
       include 'TOTAL'
-      parameter(nfldm=ldim+ldimt + 1 + ldimb)
 
       real pts, fieldout, dist, rst
       common /c_hptsr/ pts      (ldim,lhis)
@@ -1532,6 +1531,11 @@ c     ASSUMING LHIS IS MAX NUMBER OF POINTS TO READ IN ON ONE PROCESSOR
 
       common /scrcg/  pm1 (lx1,ly1,lz1,lelv) ! mapped pressure
       common /outtmp/ wrk (lx1*ly1*lz1*lelt,nfldm)
+      if (ifbo) then
+        parameter(nfldm=ldim+ldimt + 1 + ldimb)
+      else then
+        parameter(nfldm = ldim + ldimt + 1)
+      endif
 
 
       logical iffind
@@ -2090,7 +2094,7 @@ c     ASSUMING LHIS IS MAX NUMBER OF POINTS TO READ IN ON ONE PROCESSOR
       include 'SIZE'
       include 'TOTAL'
 
-      parameter(nfldm=ldim+ldimt+1 + ldimb)
+c      parameter(nfldm=ldim+ldimt+1 + ldimb)
 
       real pts, fieldout, dist, rst
       common /c_hptsr/ pts      (ldim,lhis)
@@ -2115,6 +2119,12 @@ c     ASSUMING LHIS IS MAX NUMBER OF POINTS TO READ IN ON ONE PROCESSOR
       data    npoints /0/
 
       save    inth_hpts
+
+      if (ifbo) then
+        parameter(nfldm=ldim+ldimt + 1 + ldimb)
+      else then
+        parameter(nfldm = ldim + ldimt + 1)
+      endif
 
       nxyz  = lx1*ly1*lz1
       ntot  = nxyz*nelt 
