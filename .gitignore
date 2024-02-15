@@ -2,6 +2,7 @@
 *.log
 *.mod
 *.o
+*.grd
 
 # tool executables built by running maketools
 bin/cgns2nek
@@ -19,5 +20,8 @@ bin/pretex
 bin/prex
 bin/re2torea
 bin/reatore2
+bin/makenek
+core/makefile.template
+tools/maketools
 
 __pycache__
