@@ -1731,47 +1731,50 @@ c                        npts=local count; npoints=total count
 
       if (lt2.gt.npts) then
 
-         call buffer_in(xyz,npp,npoints,lt2)
-         if(npoints.gt.np*npts) then
-           if(nid.eq.0)write(6,*)'ABORT in hpts(): npoints > NP*lhis!!' 
-           if(nid.eq.0)write(6,*)'Change SIZE: ',np,npts,npoints
-           call exitt
-         endif
-
-         npmax = (npoints/npts)
-         if(mod(npoints,npts).eq.0) npmax=npmax+1
-
-         if(nid.gt.0.and.npp.gt.0) then
-          npts_b = lt2*(nid-1)               ! # pts  offset(w/o 0)
-          nprc_b = npts_b/npts               ! # proc offset(w/o 0)
-
-          istart = mod(npts_b,npts)          ! istart-->npts pts left
-          ip     = nprc_b + 1                ! PID offset
-          icount = istart                    ! point offset
-         elseif(nid.eq.0) then
-          npts0   = mod1(npoints,lt2)        ! Node 0 pts
-          npts_b  = npoints - npts0          ! # pts before Node 0
-          nprc_b  = npts_b/npts
-
-          istart  = mod(npts_b,npts)
-          ip      = nprc_b + 1
-          icount  = istart
-         endif
-
-         do i =1,npp
-            icount = icount + 1
-            if(ip.gt.npmax) ip = 0
-            mid(i) = ip
-            if (icount.eq.npts) then
-               ip     = ip+1
-               icount = 0
-            endif
-         enddo
-
-         call fgslib_crystal_tuple_transfer 
-     &      (cr_h,npp,lt2,mid,1,pts,0,xyz,ldim,1)
-
-         call copy(pts,xyz,ldim*npp)
+         if(nid.eq.0)write(6,*)'ABORT in gpts(): lt2>lhis!!' 
+         call exitt
+c
+c         call buffer_in(xyz,npp,npoints,lt2)
+c         if(npoints.gt.np*npts) then
+c           if(nid.eq.0)write(6,*)'ABORT in hpts(): npoints > NP*lhis!!' 
+c           if(nid.eq.0)write(6,*)'Change SIZE: ',np,npts,npoints
+c           call exitt
+c         endif
+c
+c         npmax = (npoints/npts)
+c         if(mod(npoints,npts).eq.0) npmax=npmax+1
+c
+c         if(nid.gt.0.and.npp.gt.0) then
+c          npts_b = lt2*(nid-1)               ! # pts  offset(w/o 0)
+c          nprc_b = npts_b/npts               ! # proc offset(w/o 0)
+c
+c          istart = mod(npts_b,npts)          ! istart-->npts pts left
+c          ip     = nprc_b + 1                ! PID offset
+c          icount = istart                    ! point offset
+c         elseif(nid.eq.0) then
+c          npts0   = mod1(npoints,lt2)        ! Node 0 pts
+c          npts_b  = npoints - npts0          ! # pts before Node 0
+c          nprc_b  = npts_b/npts
+c
+c          istart  = mod(npts_b,npts)
+c          ip      = nprc_b + 1
+c          icount  = istart
+c         endif
+c
+c         do i =1,npp
+c            icount = icount + 1
+c            if(ip.gt.npmax) ip = 0
+c            mid(i) = ip
+c            if (icount.eq.npts) then
+c               ip     = ip+1
+c               icount = 0
+c            endif
+c         enddo
+c
+c         call fgslib_crystal_tuple_transfer 
+c     &      (cr_h,npp,lt2,mid,1,pts,0,xyz,ldim,1)
+c
+c         call copy(pts,xyz,ldim*npp)
       else
          call buffer_in(pts,npp,npoints,npts)
       endif
@@ -2150,8 +2153,6 @@ c     ASSUMING LHIS IS MAX NUMBER OF POINTS TO READ IN ON ONE PROCESSOR
       call prepost_map(0)  ! maps axisymm and pressure
 
       ! pack working array
-      !here is where you can change the fields. Add an if statement that
-      !sees if you are looking for curls.
       nflds = 0
       
       if(.not.(gpts_curl)) then   
@@ -2505,7 +2506,7 @@ c-----------------------------------------------------------------------
 
         call nekgsync
 
-        if(ipass.lt.npass) then
+        if(ipass.lt.(npass)) then
           if(nid.eq.0) then
             call crecv(ipass,buf,len)
             do ip = 1,nbuff
