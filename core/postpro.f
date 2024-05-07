@@ -2199,6 +2199,9 @@ c     ASSUMING LHIS IS MAX NUMBER OF POINTS TO READ IN ON ONE PROCESSOR
         if(ifbo) then
         call  comp_vort3(vort_badshape,w1,w2,bx,by,bz)
           vort = reshape(vort_badshape,(/lx1,ly1,lz1,lelt,3/))
+          write(*,*) 'You need to fix the 
+     &          second index of wrk (postpro.f line 2204)'
+          call EXIT(0)
           call copy(wrk(1,1),vort(:,:,:,:,1),ntot)
           call copy(wrk(1,2),vort(:,:,:,:,2),ntot)
           call copy(wrk(1,3),vort(:,:,:,:,3),ntot)
