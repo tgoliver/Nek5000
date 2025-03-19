@@ -213,7 +213,7 @@ c-----------------------------------------------------------------------
          call userchk
          tuchk = tuchk + dnekclock()-etime1
          call prepost (ifoutfld,'his')
-         call prepost (ifoutfld,'grd')
+c         call prepost (ifoutfld,'grd')
          call in_situ_check()
          if (mod(kstep,irstat).eq.0 .and. lastep.eq.0) call runstat 
          if (lastep .eq. 1) goto 1001

@@ -2241,6 +2241,7 @@ c     ASSUMING LHIS IS MAX NUMBER OF POINTS TO READ IN ON ONE PROCESSOR
       endif
 
 
+      call nekgsync
       ! evaluate input field at given points
       do ifld = 1,nflds
          call fgslib_findpts_eval(inth_hpts,fieldout(ifld,1),nfldm,
@@ -2251,6 +2252,8 @@ c     ASSUMING LHIS IS MAX NUMBER OF POINTS TO READ IN ON ONE PROCESSOR
      &                            wrk(1,ifld))
       enddo
       ! write interpolation results to hpts.out
+      call nekgsync
+
       call gpts_out(fieldout,pts,nflds,nfldm,npts,
      $     npoints,nbuff,gpts_curl)
 
@@ -2660,6 +2663,7 @@ c              enddo
       do ipass = 1,npass
 
 
+      
         call nekgsync
         if(ipass.lt.npass) then
           if(nid.eq.0) then
