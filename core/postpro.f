@@ -1517,8 +1517,8 @@ c     ASSUMING LHIS IS MAX NUMBER OF POINTS TO READ IN ON ONE PROCESSOR
 
       include 'SIZE'
       include 'TOTAL'
-
-      parameter(nfldm=ldim+ldimt+1)
+      
+      parameter(nfldm=ldim+ldimt + 1 + ldimb)
 
       real pts, fieldout, dist, rst
       common /c_hptsr/ pts      (ldim,lhis)
@@ -1588,12 +1588,24 @@ c     ASSUMING LHIS IS MAX NUMBER OF POINTS TO READ IN ON ONE PROCESSOR
         nflds = nflds + 1
         call copy(wrk(1,nflds),t,ntot)
       endif
+      if(ifbo) then
+        call copy(wrk(1,nflds+1),bx,ntot)
+        call copy(wrk(1,nflds+2),by,ntot)
+        if(if3d) then
+          call copy(wrk(1,nflds+3),bz,ntot)
+          nflds = nflds + 3
+        else
+          nflds = nflds + 2
+        endif
+      endif
       do i = 1,ldimt
          if(ifpsco(i)) then
            nflds = nflds + 1
            call copy(wrk(1,nflds),T(1,1,1,1,i+1),ntot)
          endif
       enddo
+
+      
       
       ! interpolate
       if(icalld.eq.0) then
@@ -1628,7 +1640,7 @@ c     ASSUMING LHIS IS MAX NUMBER OF POINTS TO READ IN ON ONE PROCESSOR
 
 
       ! evaluate input field at given points
-      do ifld = 1,nflds
+      do ifld = 1, nflds
          call fgslib_findpts_eval(inth_hpts,fieldout(ifld,1),nfldm,
      &                            rcode,1,
      &                            proc,1,
@@ -1719,47 +1731,50 @@ c                        npts=local count; npoints=total count
 
       if (lt2.gt.npts) then
 
-         call buffer_in(xyz,npp,npoints,lt2)
-         if(npoints.gt.np*npts) then
-           if(nid.eq.0)write(6,*)'ABORT in hpts(): npoints > NP*lhis!!' 
-           if(nid.eq.0)write(6,*)'Change SIZE: ',np,npts,npoints
-           call exitt
-         endif
-
-         npmax = (npoints/npts)
-         if(mod(npoints,npts).eq.0) npmax=npmax+1
-
-         if(nid.gt.0.and.npp.gt.0) then
-          npts_b = lt2*(nid-1)               ! # pts  offset(w/o 0)
-          nprc_b = npts_b/npts               ! # proc offset(w/o 0)
-
-          istart = mod(npts_b,npts)          ! istart-->npts pts left
-          ip     = nprc_b + 1                ! PID offset
-          icount = istart                    ! point offset
-         elseif(nid.eq.0) then
-          npts0   = mod1(npoints,lt2)        ! Node 0 pts
-          npts_b  = npoints - npts0          ! # pts before Node 0
-          nprc_b  = npts_b/npts
-
-          istart  = mod(npts_b,npts)
-          ip      = nprc_b + 1
-          icount  = istart
-         endif
-
-         do i =1,npp
-            icount = icount + 1
-            if(ip.gt.npmax) ip = 0
-            mid(i) = ip
-            if (icount.eq.npts) then
-               ip     = ip+1
-               icount = 0
-            endif
-         enddo
-
-         call fgslib_crystal_tuple_transfer 
-     &      (cr_h,npp,lt2,mid,1,pts,0,xyz,ldim,1)
-
-         call copy(pts,xyz,ldim*npp)
+         if(nid.eq.0)write(6,*)'ABORT in gpts(): lt2>lhis!!' 
+         call exitt
+c
+c         call buffer_in(xyz,npp,npoints,lt2)
+c         if(npoints.gt.np*npts) then
+c           if(nid.eq.0)write(6,*)'ABORT in hpts(): npoints > NP*lhis!!' 
+c           if(nid.eq.0)write(6,*)'Change SIZE: ',np,npts,npoints
+c           call exitt
+c         endif
+c
+c         npmax = (npoints/npts)
+c         if(mod(npoints,npts).eq.0) npmax=npmax+1
+c
+c         if(nid.gt.0.and.npp.gt.0) then
+c          npts_b = lt2*(nid-1)               ! # pts  offset(w/o 0)
+c          nprc_b = npts_b/npts               ! # proc offset(w/o 0)
+c
+c          istart = mod(npts_b,npts)          ! istart-->npts pts left
+c          ip     = nprc_b + 1                ! PID offset
+c          icount = istart                    ! point offset
+c         elseif(nid.eq.0) then
+c          npts0   = mod1(npoints,lt2)        ! Node 0 pts
+c          npts_b  = npoints - npts0          ! # pts before Node 0
+c          nprc_b  = npts_b/npts
+c
+c          istart  = mod(npts_b,npts)
+c          ip      = nprc_b + 1
+c          icount  = istart
+c         endif
+c
+c         do i =1,npp
+c            icount = icount + 1
+c            if(ip.gt.npmax) ip = 0
+c            mid(i) = ip
+c            if (icount.eq.npts) then
+c               ip     = ip+1
+c               icount = 0
+c            endif
+c         enddo
+c
+c         call fgslib_crystal_tuple_transfer 
+c     &      (cr_h,npp,lt2,mid,1,pts,0,xyz,ldim,1)
+c
+c         call copy(pts,xyz,ldim*npp)
       else
          call buffer_in(pts,npp,npoints,npts)
       endif
@@ -2063,3 +2078,699 @@ c         LAST FOUR LINES
       return
       end
 c-----------------------------------------------------------------------
+c Added by Tobias Oliver, tobias.oliver@colorado.edu
+c University of Colorado, Department of Physics
+c I barely know how to use a computer, so this probably does not work
+      
+c-----------------------------------------------------------------------
+      subroutine gpts(gpts_curl)
+c
+c     evaluate velocity, temperature, pressure and ps-scalars 
+c     for list of points and dump results
+c     note: read/write on rank0 only 
+c
+c     ASSUMING LHIS IS MAX NUMBER OF POINTS TO READ IN ON ONE PROCESSOR
+
+      include 'SIZE'
+      include 'TOTAL'
+
+      parameter(nfldm=ldim+ldimt + 1 + ldimb)
+
+      real pts, fieldout, dist, rst
+      common /c_hptsr/ pts      (ldim,lhis)
+     $               , fieldout (nfldm,lhis)
+     $               , dist     (lhis)
+     $               , rst      (lhis*ldim)
+
+      common /nekmpi/ nidd,npp,nekcomm,nekgroup,nekreal
+
+      integer rcode, elid, proc
+      common /c_hptsi/ rcode(lhis),elid(lhis),proc(lhis)
+
+      common /scrcg/  pm1 (lx1,ly1,lz1,lelv) ! mapped pressure
+      common /outtmp/ wrk (lx1*ly1*lz1*lelt,nfldm)
+
+
+      logical iffind
+      logical gpts_curl
+      real vort_badshape(lx1*ly1*lz1*lelt,3)
+      real vort(lx1,ly1,lz1,lelt,3)
+
+      integer icalld,npoints,npts
+      save    icalld,npoints,npts
+      data    icalld  /0/
+      data    npoints /0/
+
+      save    inth_hpts
+
+
+      nxyz  = lx1*ly1*lz1
+      ntot  = nxyz*nelt 
+      nbuff = lhis      ! point to be read in on 1 proc.
+
+      toldist = 5e-6
+
+      if(nio.eq.0) write(6,*) 'dump grid points'
+
+      if(icalld.eq.0) then
+        npts  = lhis      ! number of points per proc
+        call gpts_in(pts,npts,npoints)
+
+        tol     = 5e-13
+        n       = lx1*ly1*lz1*lelt
+        npt_max = 128
+        nxf     = 2*lx1 ! fine mesh for bb-test
+        nyf     = 2*ly1
+        nzf     = 2*lz1
+        bb_t    = 0.01 ! relative size to expand bounding boxes by
+        call fgslib_findpts_setup(inth_hpts,nekcomm,np,ldim,
+     &                            xm1,ym1,zm1,lx1,ly1,lz1,
+     &                            nelt,nxf,nyf,nzf,bb_t,n,n,
+     &                            npt_max,tol)
+      endif
+
+
+      call prepost_map(0)  ! maps axisymm and pressure
+
+      ! pack working array
+      nflds = 0
+      
+      if(.not.(gpts_curl)) then   
+        if(ifvo) then
+          call copy(wrk(1,1),vx,ntot)
+          call copy(wrk(1,2),vy,ntot)
+          if(if3d) call copy(wrk(1,3),vz,ntot)
+          nflds = ldim
+        endif
+        if(ifpo) then
+          nflds = nflds + 1
+          call copy(wrk(1,nflds),pm1,ntot)
+        endif
+        if(ifto) then
+          nflds = nflds + 1
+          call copy(wrk(1,nflds),t,ntot)
+        endif
+        if(ifbo) then
+          call copy(wrk(1,nflds+1),bx,ntot)
+          call copy(wrk(1,nflds+2),by,ntot)
+          if(if3d) then
+            call copy(wrk(1,nflds+3),bz,ntot)
+            nflds = nflds + 3
+          else
+            nflds = nflds + 2
+          endif
+        endif
+        do i = 1,ldimt
+           if(ifpsco(i)) then
+             nflds = nflds + 1
+             call copy(wrk(1,nflds),T(1,1,1,1,i+1),ntot)
+           endif
+        enddo
+      else if(gpts_curl .and. if3d) then   
+        !Calc curls
+        call comp_vort3(vort_badshape,w1,w2,vx,vy,vz)
+        vort = reshape(vort_badshape,(/lx1,ly1,lz1,lelt,3/))
+        if(ifvo) then
+          call copy(wrk(1,1),vort(:,:,:,:,1),ntot)
+          call copy(wrk(1,2),vort(:,:,:,:,2),ntot)
+          call copy(wrk(1,3),vort(:,:,:,:,3),ntot)
+          nflds = ldim
+        endif
+        if(ifbo) then
+        call  comp_vort3(vort_badshape,w1,w2,bx,by,bz)
+          vort = reshape(vort_badshape,(/lx1,ly1,lz1,lelt,3/))
+          write(*,*) 'You need to fix the 
+     &          second index of wrk (postpro.f line 2204)'
+          call EXIT(0)
+          call copy(wrk(1,1),vort(:,:,:,:,1),ntot)
+          call copy(wrk(1,2),vort(:,:,:,:,2),ntot)
+          call copy(wrk(1,3),vort(:,:,:,:,3),ntot)
+          nflds = nflds + 3
+        endif
+      endif
+      
+      ! interpolate
+      if(icalld.eq.0) then
+        call fgslib_findpts(inth_hpts,rcode,1,
+     &                      proc,1,
+     &                      elid,1,
+     &                      rst,ldim,
+     &                      dist,1,
+     &                      pts(1,1),ldim,
+     &                      pts(2,1),ldim,
+     &                      pts(3,1),ldim,npts)
+     
+        nfail = 0 
+        do i=1,npts
+           ! check return code 
+           if(rcode(i).eq.1) then
+             if(sqrt(dist(i)).gt.toldist) then
+               nfail = nfail + 1
+               IF (NFAIL.LE.5) WRITE(6,'(a,1p4e15.7)') 
+     &     ' WARNING: point on boundary or outside the mesh xy[z]d^2:'
+     &     ,(pts(k,i),k=1,ldim),dist(i)
+             endif   
+           elseif(rcode(i).eq.2) then
+             nfail = nfail + 1
+             if (nfail.le.5) write(6,'(a,1p3e15.7)') 
+     &        ' WARNING: point not within mesh xy[z]: !',
+     &        (pts(k,i),k=1,ldim)
+           endif
+        enddo
+        icalld = 1
+      endif
+
+
+      call nekgsync
+      ! evaluate input field at given points
+      do ifld = 1,nflds
+         call fgslib_findpts_eval(inth_hpts,fieldout(ifld,1),nfldm,
+     &                            rcode,1,
+     &                            proc,1,
+     &                            elid,1,
+     &                            rst,ldim,npts,
+     &                            wrk(1,ifld))
+      enddo
+      ! write interpolation results to hpts.out
+      call nekgsync
+
+      call gpts_out(fieldout,pts,nflds,nfldm,npts,
+     $     npoints,nbuff,gpts_curl)
+
+      call prepost_map(1)  ! maps back axisymm arrays
+
+      return
+      end
+c-----------------------------------------------------------------------
+      subroutine gpts_in(pts,npts,npoints) 
+c                        npts=local count; npoints=total count
+
+      include 'SIZE'
+      include 'PARALLEL'
+
+      parameter (lt2=2*lx1*ly1*lz1*lelt)
+      common /scrns/ xyz(ldim,lt2)
+      common /scruz/ mid(lt2)  ! Target proc id
+      real    pts(ldim,npts)
+
+      if (lt2.gt.npts) then
+
+         call gbuffer_in(xyz,npp,npoints,lt2)
+         if(npoints.gt.np*npts) then
+           if(nid.eq.0)write(6,*)'ABORT in gpts(): npoints > NP*lhis!!' 
+           if(nid.eq.0)write(6,*)'Change SIZE: ',np,npts,npoints
+           call exitt
+         endif
+
+         npmax = (npoints/npts)
+         if(mod(npoints,npts).eq.0) npmax=npmax+1
+
+         if(nid.gt.0.and.npp.gt.0) then
+          npts_b = lt2*(nid-1)               ! # pts  offset(w/o 0)
+          nprc_b = npts_b/npts               ! # proc offset(w/o 0)
+
+          istart = mod(npts_b,npts)          ! istart-->npts pts left
+          ip     = nprc_b + 1                ! PID offset
+          icount = istart                    ! point offset
+         elseif(nid.eq.0) then
+          npts0   = mod1(npoints,lt2)        ! Node 0 pts
+          npts_b  = npoints - npts0          ! # pts before Node 0
+          nprc_b  = npts_b/npts
+
+          istart  = mod(npts_b,npts)
+          ip      = nprc_b + 1
+          icount  = istart
+         endif
+
+         do i =1,npp
+            icount = icount + 1
+            if(ip.gt.npmax) ip = 0
+            mid(i) = ip
+            if (icount.eq.npts) then
+               ip     = ip+1
+               icount = 0
+            endif
+         enddo
+
+         call fgslib_crystal_tuple_transfer 
+     &      (cr_h,npp,lt2,mid,1,pts,0,xyz,ldim,1)
+
+         call copy(pts,xyz,ldim*npp)
+      else
+         call gbuffer_in(pts,npp,npoints,npts)
+      endif
+      npts = npp
+
+
+      return
+      end
+c-----------------------------------------------------------------------
+      subroutine gbuffer_in(buffer,npp,npoints,nbuf)
+        
+      include 'SIZE'
+      include 'INPUT'
+      include 'PARALLEL'
+
+      real    buffer(ldim,nbuf)  
+
+      ierr = 0
+      if(nid.eq.0) then
+        write(6,*) 'reading grid points'
+        open(51,file=grdfle,status='old',err=100)
+        read(51,*,err=100) npoints
+        goto 101
+ 100    ierr = 1
+ 101    continue
+      endif
+      ierr=iglsum(ierr,1)
+      if(ierr.gt.0) then
+        if(nio.eq.0) 
+     &   write(6,*) 'Cannot open history file in subroutine hpts()'
+        call exitt
+      endif
+      
+      call bcast(npoints,isize)
+      if(npoints.gt.(lhis-1)*np) then
+        if(nid.eq.0) write(6,*) 'ABORT: Increase lhis in SIZE!'
+        call exitt
+      endif
+      if(nid.eq.0) write(6,*) 'found ', npoints, ' points'
+
+
+      npass =  npoints/nbuf +1  !number of passes to cover all pts
+      n0    =  mod(npoints,nbuf)!remainder 
+      if(n0.eq.0) then
+         npass = npass-1
+         n0    = nbuf
+      endif
+
+      len = wdsize*ldim*nbuf
+      if (nid.gt.0.and.nid.lt.npass) msg_id=irecv(nid,buffer,len)
+      call nekgsync
+      
+      npp=0  
+      if(nid.eq.0) then
+        i1 = nbuf
+        do ipass = 1,npass
+           if(ipass.eq.npass) i1 = n0
+           do i = 1,i1
+              read(51,*) (buffer(j,i),j=1,ldim) 
+           enddo
+           if(ipass.lt.npass)call csend(ipass,buffer,len,ipass,0)
+        enddo
+        npp = n0
+      elseif (nid.lt.npass)  then !processors receiving data
+        call msgwait(msg_id)
+        npp=nbuf
+      endif
+
+      return
+      end
+c-----------------------------------------------------------------------
+      subroutine gpts_out(fieldout,pts,nflds,nfldm,npts,npoints,
+     $                    nbuff,gpts_curl)
+
+      use hdf5
+
+      include 'SIZE'
+      include 'TOTAL'
+
+      real buf(nfldm,nbuff),fieldout(nfldm,nbuff)
+      real pbuf(ldim,nbuff),pts(ldim,npts)
+      integer(HSIZE_T) offset(1)
+      character*4 callNumString
+      character*12 filename
+      logical gpts_curl
+
+      integer gptsCallNum,plusOne
+      integer error,space_rank
+      integer(HSIZE_T) data_dims(1)
+      integer(HSIZE_T) metadata_dims(1)
+      integer(HID_T) file_id, dspace_id,dspacet_id
+      integer(HID_T) dset_idx,dset_idy,dset_idz,
+     $               dset_idux,dset_iduy,dset_iduz,
+     $               dset_idbx,dset_idby,dset_idbz,
+     $               dset_idp,dset_idt,dset_idtime
+
+      save gptsCallNum
+      data gptsCallNum /0/
+
+      len = wdsize*nfldm*nbuff
+      len2 = wdsize*ldim*nbuff
+
+      data_dims(1) = npoints
+      metadata_dims(1) = 1
+      space_rank = 1
+
+      write(callNumString,'(i0.4)') gptsCallNum
+      if(nid.eq.0) then
+        if(.not.(gpts_curl))then
+          filename = 'grd'//callNumString//'.hdf5'
+        else if(gpts_curl .and. (ldim.eq.3) )then
+          filename = 'crl'//callNumString//'.hdf5'
+        endif
+
+        call h5open_f(error)
+        call h5fcreate_f(filename,H5F_ACC_TRUNC_F,file_id,error)
+        call h5screate_simple_f(space_rank,metadata_dims,
+     $                          dspacet_id,error)
+        !create dataset
+        call h5dcreate_f(file_id,"time",H5T_NATIVE_DOUBLE,dspacet_id,
+     $   dset_idtime,error)
+        if (nid.eq.0) then
+          call h5dwrite_f(dset_idtime,H5T_NATIVE_DOUBLE,time,
+     $                    metadata_dims,error)
+          call h5dclose_f(dset_idtime,error)
+          call h5sclose_f(dspacet_id,error)
+
+        endif
+
+        !open dataspace
+        call h5screate_simple_f(space_rank,data_dims,dspace_id,error)
+      
+        if(.not.(gpts_curl)) then
+          !create dataset
+          call h5dcreate_f(file_id,"x",H5T_NATIVE_DOUBLE,dspace_id,
+     $     dset_idx,error)
+          call h5dcreate_f(file_id,"y",H5T_NATIVE_DOUBLE,dspace_id,
+     $    dset_idy,error)
+          call h5dcreate_f(file_id,"u",H5T_NATIVE_DOUBLE,dspace_id,
+     $    dset_idux,error)
+          call h5dcreate_f(file_id,"v",H5T_NATIVE_DOUBLE,dspace_id,
+     $    dset_iduy,error)
+          call h5dcreate_f(file_id,"p",H5T_NATIVE_DOUBLE,dspace_id,
+     $    dset_idp,error)
+          call h5dcreate_f(file_id,"t",H5T_NATIVE_DOUBLE,dspace_id,
+     $    dset_idt,error)
+          if (ldim.eq.3) then
+            call h5dcreate_f(file_id,"z",H5T_NATIVE_DOUBLE,dspace_id,
+     $      dset_idz,error)
+            call h5dcreate_f(file_id,"w",H5T_NATIVE_DOUBLE,dspace_id,
+     $      dset_iduz,error)
+          endif
+          if(ifbo) then
+            call h5dcreate_f(file_id,"bx",H5T_NATIVE_DOUBLE,dspace_id,
+     $      dset_idbx,error)
+            call h5dcreate_f(file_id,"by",H5T_NATIVE_DOUBLE,dspace_id,
+     $      dset_idby,error)
+            if(ldim.eq.3) then
+              call h5dcreate_f(file_id,"bz",H5T_NATIVE_DOUBLE,dspace_id,
+     $        dset_idbz,error)
+            endif
+          endif
+        else if( gpts_curl .and. (ldim.eq.3))then
+          call h5dcreate_f(file_id,"vorticity_x",H5T_NATIVE_DOUBLE,
+     $    dspace_id,dset_idux,error)
+          call h5dcreate_f(file_id,"vorticity_y",H5T_NATIVE_DOUBLE,
+     $    dspace_id,dset_iduy,error)
+          call h5dcreate_f(file_id,"vorticity_z",H5T_NATIVE_DOUBLE,
+     $    dspace_id,dset_iduz,error)
+          if(ifbo) then
+            call h5dcreate_f(file_id,"curlb_x",H5T_NATIVE_DOUBLE,
+     $      dspace_id,dset_idbx,error)
+            call h5dcreate_f(file_id,"curlb_y",H5T_NATIVE_DOUBLE,
+     $      dspace_id,dset_idby,error)
+            call h5dcreate_f(file_id,"curlb_z",H5T_NATIVE_DOUBLE,
+     $      dspace_id,dset_idbz,error)
+          endif
+
+        endif
+      endif
+
+
+      npass = npoints/nbuff + 1
+      il = mod(npoints,nbuff)
+      offset(1) = 0
+
+
+      if(il.eq.0) then
+         il = nbuff
+         npass = npass-1
+      endif
+
+      do ipass = 1,npass
+
+        call nekgsync
+
+        if(ipass.lt.(npass)) then
+          if(nid.eq.0) then
+            call crecv(ipass,buf,len)
+            do ip = 1,nbuff
+c              write(51,'(1p20E15.7)') time,
+c     &         (buf(i,ip), i=1,nflds)
+            enddo
+            call write_hdf5(filename,buf(1,:),
+     &                      nfldm,nbuff,npoints,nbuff,offset,
+     &                      dspace_id,dset_idux)
+            call write_hdf5(filename,buf(2,:),
+     &                      nfldm,nbuff,npoints,nbuff,offset,
+     &                      dspace_id,dset_iduy)
+            if(ldim.eq.3) then
+              call write_hdf5(filename,buf(3,:),
+     &                      nfldm,nbuff,npoints,nbuff,offset,
+     &                      dspace_id,dset_iduz)
+              if(.not.(gpts_curl))then
+                call write_hdf5(filename,buf(4,:),
+     &                        nfldm,nbuff,npoints,nbuff,offset,
+     &                        dspace_id,dset_idp)
+                call write_hdf5(filename,buf(5,:),
+     &                        nfldm,nbuff,npoints,nbuff,offset,
+     &                        dspace_id,dset_idt)
+              endif
+              if(ifbo) then
+                call write_hdf5(filename,buf(6,:),
+     &                        nfldm,nbuff,npoints,nbuff,offset,
+     &                        dspace_id,dset_idbx)
+                call write_hdf5(filename,buf(7,:),
+     &                        nfldm,nbuff,npoints,nbuff,offset,
+     &                        dspace_id,dset_idby)
+                call write_hdf5(filename,buf(8,:),
+     &                        nfldm,nbuff,npoints,nbuff,offset,
+     &                        dspace_id,dset_idbz)
+              endif
+              
+            elseif(.not.(gpts_curl)) then
+              call write_hdf5(filename,buf(3,:),
+     &                      nfldm,nbuff,npoints,nbuff,offset,
+     &                      dspace_id,dset_idp)
+              call write_hdf5(filename,buf(4,:),
+     &                      nfldm,nbuff,npoints,nbuff,offset,
+     &                      dspace_id,dset_idt)
+              if(ifbo) then
+                call write_hdf5(filename,buf(5,:),
+     &                        nfldm,nbuff,npoints,nbuff,offset,
+     &                        dspace_id,dset_idbx)
+                call write_hdf5(filename,buf(6,:),
+     &                        nfldm,nbuff,npoints,nbuff,offset,
+     &                        dspace_id,dset_idby)
+              endif
+            endif
+            offset(1) = offset(1) + nbuff
+          elseif(nid.eq.ipass) then
+            call csend(ipass,fieldout,len,0,nid)
+          endif
+
+        else  !ipass.eq.npass
+          if(.not.(gpts_curl)) then
+            if(nid.eq.0) then
+              call write_hdf5(filename,pts(1,1:npts),
+     &                        nfldm,npts,npoints,nbuff,offset,
+     &                        dspace_id,dset_idx)
+              call write_hdf5(filename,pts(2,1:npts),
+     &                        nfldm,npts,npoints,nbuff,offset,
+     &                        dspace_id,dset_idy)
+              call write_hdf5(filename,fieldout(1,:),
+     &                        nfldm,npts,npoints,nbuff,offset,
+     &                        dspace_id,dset_idux)
+              call write_hdf5(filename,fieldout(2,:),
+     &                        nfldm,npts,npoints,nbuff,offset,
+     &                        dspace_id,dset_iduy)
+              if(ldim.eq.3) then
+                call write_hdf5(filename,pts(3,1:npts),
+     &                        nfldm,npts,npoints,nbuff,offset,
+     &                        dspace_id,dset_idz)
+                call write_hdf5(filename,fieldout(3,:),
+     &                        nfldm,npts,npoints,nbuff,offset,
+     &                        dspace_id,dset_iduz)
+                call write_hdf5(filename,fieldout(4,:),
+     &                        nfldm,npts,npoints,nbuff,offset,
+     &                        dspace_id,dset_idp)
+                call write_hdf5(filename,fieldout(5,:),
+     &                        nfldm,npts,npoints,nbuff,offset,
+     &                        dspace_id,dset_idt)
+                if(ifbo) then
+                  call write_hdf5(filename,fieldout(6,:),
+     &                          nfldm,npts,npoints,nbuff,offset,
+     &                          dspace_id,dset_idbx)
+                  call write_hdf5(filename,fieldout(7,:),
+     &                          nfldm,npts,npoints,nbuff,offset,
+     &                          dspace_id,dset_idby)
+                  call write_hdf5(filename,fieldout(8,:),
+     &                          nfldm,npts,npoints,nbuff,offset,
+     &                          dspace_id,dset_idbz)
+                endif
+   
+              else
+                call write_hdf5(filename,fieldout(3,:),
+     &                        nfldm,npts,npoints,nbuff,offset,
+     &                        dspace_id,dset_idp)
+                call write_hdf5(filename,fieldout(4,:),
+     &                        nfldm,npts,npoints,nbuff,offset,
+     &                        dspace_id,dset_idt)
+                if(ifbo) then
+                  call write_hdf5(filename,fieldout(5,:),
+     &                          nfldm,npts,npoints,nbuff,offset,
+     &                          dspace_id,dset_idbx)
+                  call write_hdf5(filename,fieldout(6,:),
+     &                          nfldm,npts,npoints,nbuff,offset,
+     &                          dspace_id,dset_idby)
+                endif
+              endif
+c              do ip = 1,il
+c                write(51,'(1p20E15.7)') time,
+c     &           (fieldout(i,ip), i=1,nflds)
+c              enddo
+            endif
+          elseif(gpts_curl .and. (ldim.eq.3))then
+
+            if(nid.eq.0) then
+              call write_hdf5(filename,fieldout(1,:),
+     &                        nfldm,npts,npoints,nbuff,offset,
+     &                        dspace_id,dset_idux)
+              call write_hdf5(filename,fieldout(2,:),
+     &                        nfldm,npts,npoints,nbuff,offset,
+     &                        dspace_id,dset_iduy)
+              call write_hdf5(filename,fieldout(3,:),
+     &                      nfldm,npts,npoints,nbuff,offset,
+     &                      dspace_id,dset_iduz)
+              if(ifbo) then
+                call write_hdf5(filename,fieldout(6,:),
+     &                        nfldm,npts,npoints,nbuff,offset,
+     &                        dspace_id,dset_idbx)
+                call write_hdf5(filename,fieldout(7,:),
+     &                        nfldm,npts,npoints,nbuff,offset,
+     &                        dspace_id,dset_idby)
+                call write_hdf5(filename,fieldout(8,:),
+     &                        nfldm,npts,npoints,nbuff,offset,
+     &                        dspace_id,dset_idbz)
+              endif !if(ifbo)
+            endif   !(nid.eq.0)
+          endif     !elseif(gpts_curl .and. (ldim.eq.3))then
+        endif       !ipass.eq.npass
+      enddo
+
+      offset(1) = 0
+      do ipass = 1,npass
+
+
+      
+        call nekgsync
+        if(ipass.lt.npass) then
+          if(nid.eq.0) then
+            call crecv(ipass,pbuf,len2)
+            if(.not.(gpts_curl))then
+              call write_hdf5(filename,pbuf(1,1:nbuff),
+     &                      nfldm,nbuff,npoints,nbuff,offset,
+     &                      dspace_id,dset_idx)
+              call write_hdf5(filename,pbuf(2,1:nbuff),
+     &                      nfldm,nbuff,npoints,nbuff,offset,
+     &                      dspace_id,dset_idy)
+              if(ldim.eq.3) then
+                call write_hdf5(filename,pbuf(3,1:nbuff),
+     &                        nfldm,nbuff,npoints,nbuff,offset,
+     &                        dspace_id,dset_idz)
+              endif
+            endif
+            offset(1) = offset(1) + nbuff
+          elseif(nid.eq.ipass) then
+            call csend(ipass,pts,len2,0,nid)
+          endif
+
+
+        endif
+      enddo
+
+      if(nid.eq.0) then
+        if(.not.(gpts_curl)) then
+          call h5dclose_f(dset_idx,error)
+          call h5dclose_f(dset_idy,error)
+          call h5dclose_f(dset_idux,error)
+          call h5dclose_f(dset_iduy,error)
+          call h5dclose_f(dset_idp,error)
+          call h5dclose_f(dset_idt,error)
+          if(ifbo) then
+            call h5dclose_f(dset_idbx,error)
+            call h5dclose_f(dset_idby,error)
+          endif
+          if (ldim.eq.3) then
+            call h5dclose_f(dset_idz,error)
+            call h5dclose_f(dset_iduz,error)
+            if(ifbo) then
+              call h5dclose_f(dset_idbz,error)
+            endif
+          endif
+          gptsCallNum = gptsCallNum+1
+        else if(gpts_curl .and. (ldim.eq.3)) then
+          call h5dclose_f(dset_idux,error)
+          call h5dclose_f(dset_iduy,error)
+          call h5dclose_f(dset_iduz,error)
+          if(ifbo) then
+            call h5dclose_f(dset_idbz,error)
+            call h5dclose_f(dset_idbx,error)
+            call h5dclose_f(dset_idby,error)
+          endif
+        endif
+        call h5sclose_f(dspace_id,error)
+
+
+        call h5fclose_f(file_id,error)
+
+        call h5close_f(error)
+      endif
+
+      return
+      end
+c--------------------------------------------------------------
+c Write fields to hdf5 file rather than *.grd
+      subroutine write_hdf5(filename,dArray,
+     $  nfldm,npts,npoints,nbuff,offset,
+     $  dspace_id,dset_id)
+
+      use hdf5
+
+      implicit none
+      INCLUDE 'SIZE'
+
+      character(len=*) filename
+      real    dArray(npts)
+      integer npts
+      integer error
+      integer RANK_IN
+      integer nfldm,npoints,nbuff
+      integer(HSIZE_T) data_dims(1), data_dims_in(1)
+      integer(HID_T)  dspace_id, mid
+      integer(HID_T) dset_id
+      integer(HSIZE_T) offset(1), cnt(1) 
+      integer(HSIZE_T) start(1) 
+
+      RANK_IN = 1
+      cnt(1) = npts
+      start(1) = 0
+      data_dims(1) = npoints
+      data_dims_in(1)  = npts
+      !Select hyperslab to write to 
+      call h5sselect_hyperslab_f(dspace_id,H5S_SELECT_SET_F,
+     $                           offset,cnt,error)
+
+      !Create dataspace/hyperslab to write from
+      call h5screate_simple_f(RANK_IN,data_dims_in,mid,error)
+      call h5sselect_hyperslab_f(mid,H5S_SELECT_SET_F,
+     $                          start,cnt,error)
+
+      !write dset
+      call h5dwrite_f(dset_id,H5T_NATIVE_DOUBLE,dArray,
+     $                data_dims,error,mid,dspace_id)
+
+
+      end subroutine write_hdf5
+

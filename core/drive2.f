@@ -422,15 +422,17 @@ C
       EQUIVALENCE  (SESSION,SESS1)
       EQUIVALENCE  (PATH,PATH1)
       EQUIVALENCE  (NAME,NAM1)
-      CHARACTER*1  DMP(4),FLD(4),REA(4),HIS(4),SCH(4) ,ORE(4), NRE(4)
+      CHARACTER*1  DMP(4),FLD(4),REA(4),HIS(4),GRD(4),
+     $             SCH(4) ,ORE(4), NRE(4)
       CHARACTER*1  RE2(4),PAR(4)
-      CHARACTER*4  DMP4  ,FLD4  ,REA4  ,HIS4  ,SCH4   ,ORE4  , NRE4
+      CHARACTER*4  DMP4  ,FLD4  ,REA4  ,HIS4  ,GRD4,
+     $             SCH4   ,ORE4  , NRE4
       CHARACTER*4  RE24  ,PAR4
       EQUIVALENCE (DMP,DMP4), (FLD,FLD4), (REA,REA4), (HIS,HIS4)
      $          , (SCH,SCH4), (ORE,ORE4), (NRE,NRE4)
-     $          , (RE2,RE24), (PAR,PAR4)
+     $          , (RE2,RE24), (PAR,PAR4), (GRD,GRD4)
       DATA DMP4,FLD4,REA4 /'.dmp','.fld','.rea'/
-      DATA HIS4,SCH4      /'.his','.sch'/
+      DATA HIS4,SCH4,GRD4      /'.his','.sch','.grd'/
       DATA ORE4,NRE4      /'.ore','.nre'/
       DATA RE24           /'.re2'       /
       DATA PAR4           /'.par'       /
@@ -466,6 +468,7 @@ c      call bcast(PATH,132*CSIZE)
       CALL BLANK(RE2FLE,132)
       CALL BLANK(FLDFLE,132)
       CALL BLANK(HISFLE,132)
+      CALL BLANK(GRDFLE,132)
       CALL BLANK(SCHFLE,132)
       CALL BLANK(DMPFLE,132)
       CALL BLANK(OREFLE,132)
@@ -504,6 +507,9 @@ c
 c .his file
       call chcopy(nam1  (l1),his , 4)
       call chcopy(hisfle    ,nam1,ln)
+c .grd file (second .his file)
+      call chcopy(nam1  (l1),grd , 4)
+      call chcopy(grdfle    ,nam1,ln)
 c
 c .sch file
       call chcopy(nam1  (l1),sch , 4)
